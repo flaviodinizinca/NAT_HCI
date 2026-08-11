@@ -6,12 +6,14 @@ function onOpen() {
   ui.createMenu('📦 Gestão de Estoque')
     .addItem('▶️ Executar Rotina Completa', 'processarRotinaCompleta')
     .addSeparator()
-    .addItem('1. Atualizar Base de Dados', 'importarDadosIndependente') // Mantido caso queira rodar isolado
+    .addItem('1. Atualizar Base de Dados', 'importarDadosIndependente')
     .addItem('2. Gerar Planilha de Urgências', 'criarPlanilhaUrgencias')
     .addItem('3. Atualizar Guia HCI', 'atualizarGuiaHC1Independente')
     .addItem('4. Atualizar Centro Cirúrgico', 'atualizarCentroCirurgicoIndependente')
+    .addItem('5. Atualizar Fios', 'atualizarFiosIndependente')
+    .addItem('6. Atualizar Endoscopia', 'atualizarEndoscopiaIndependente')
     .addSeparator()
-    .addItem('5. Enviar para Status Report', 'enviarParaStatusReport')
+    .addItem('7. Enviar para Status Report', 'enviarParaStatusReport')
     .addToUi();
 }
 
@@ -22,7 +24,7 @@ function processarRotinaCompleta() {
   const ui = SpreadsheetApp.getUi();
   const ssLocal = SpreadsheetApp.getActiveSpreadsheet();
   
-  ssLocal.toast('Conectando à base externa...', 'Passo 1 de 5', 5);
+  ssLocal.toast('Conectando à base externa...', 'Passo 1 de 7', 5);
   
   // =========================================================================
   // 1. CONEXÃO ÚNICA COM A BASE EXTERNA
@@ -49,16 +51,22 @@ function processarRotinaCompleta() {
   // 2. DISPARO DAS FUNÇÕES EM SEQUÊNCIA
   // =========================================================================
   
-  ssLocal.toast('Atualizando Base de Dados (NATHCI)...', 'Passo 2 de 5', 5);
+  ssLocal.toast('Atualizando Base de Dados (NATHCI)...', 'Passo 2 de 7', 5);
   importarDados(dadosEstoqueBrutos); 
   
-  ssLocal.toast('Gerando Planilha de Urgências...', 'Passo 3 de 5', 5);
+  ssLocal.toast('Gerando Planilha de Urgências...', 'Passo 3 de 7', 5);
   criarPlanilhaUrgencias(); // Esta não precisa receber dados externos, ela lê o NATHCI interno
   
-  ssLocal.toast('Atualizando Centro Cirúrgico...', 'Passo 4 de 5', 5);
+  ssLocal.toast('Atualizando Centro Cirúrgico...', 'Passo 4 de 7', 5);
   atualizarCentroCirurgico(dadosEstoqueBrutos);
+
+  ssLocal.toast('Atualizando Fios Centro Cirúrgico...', 'Passo 5 de 7', 5);
+  atualizarFiosCentroCirurgico(dadosEstoqueBrutos);
+
+  ssLocal.toast('Atualizando Endoscopia...', 'Passo 6 de 7', 5);
+  atualizarEndoscopia(dadosEstoqueBrutos);
   
-  ssLocal.toast('Atualizando Guia HCI...', 'Passo 5 de 5', 5);
+  ssLocal.toast('Atualizando Guia HCI...', 'Passo 7 de 7', 5);
   // Esta fica por último pois dispara a tela de confirmação de e-mail ao final
   atualizarGuiaHC1(dadosEstoqueBrutos); 
 }
