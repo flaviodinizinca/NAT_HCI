@@ -21,10 +21,19 @@ function executarAtualizacaoIsolada(funcaoAtualizacao, abaDados, abaDash) {
   const idExterna = '1s44YD2ozLAbBdGQbBE5iW7HcUzvQULZqd4ynYlV_HXA';
   try {
     const ssExterna = SpreadsheetApp.openById(idExterna);
-    const guiaEstoque = ssExterna.getSheetByName('DadosEstoque');
-    const dadosBrutos = guiaEstoque.getDataRange().getDisplayValues();
     
-    funcaoAtualizacao(dadosBrutos);
+    // Puxa os dados do Estoque
+    const guiaEstoque = ssExterna.getSheetByName('DadosEstoque');
+    const dadosEstoqueBrutos = guiaEstoque.getDataRange().getDisplayValues();
+    
+    // Puxa os dados de Entradas (usando getValues para manipular as datas corretamente)
+    const guiaEntradas = ssExterna.getSheetByName('EntradaEmpenhos');
+    let dadosEntradasBrutos = [];
+    if (guiaEntradas) {
+      dadosEntradasBrutos = guiaEntradas.getDataRange().getValues();
+    }
+    
+    funcaoAtualizacao(dadosEstoqueBrutos, dadosEntradasBrutos);
     
     SpreadsheetApp.getUi().alert('Sucesso', `Valores atualizados na aba ${abaDados} e Gráfico gerado na aba ${abaDash}!`, SpreadsheetApp.getUi().ButtonSet.OK);
   } catch (e) {
@@ -36,23 +45,23 @@ function executarAtualizacaoIsolada(funcaoAtualizacao, abaDados, abaDash) {
 // FUNÇÕES ESPECÍFICAS DE CADA SETOR (Chamadas pela Função Mestre ou Menu)
 // =========================================================================
 
-function atualizarCentroCirurgico(dadosEstoqueBrutos) {
-  atualizarSetorGenerico(dadosEstoqueBrutos, "Centro.Cir.", "Dash.C.Cir", "Evolução de Status - Centro Cirúrgico (Últimos 7 Dias)");
+function atualizarCentroCirurgico(dadosEstoqueBrutos, dadosEntradasBrutos) {
+  atualizarSetorGenerico(dadosEstoqueBrutos, dadosEntradasBrutos, "Centro.Cir.", "Dash.C.Cir", "Evolução de Status - Centro Cirúrgico (Últimos 7 Dias)");
 }
 
-function atualizarFiosCentroCirurgico(dadosEstoqueBrutos) {
-  atualizarSetorGenerico(dadosEstoqueBrutos, "Fios CentroCirurgico", "Dash.Fios", "Evolução de Status - Fios (Últimos 7 Dias)");
+function atualizarFiosCentroCirurgico(dadosEstoqueBrutos, dadosEntradasBrutos) {
+  atualizarSetorGenerico(dadosEstoqueBrutos, dadosEntradasBrutos, "Fios CentroCirurgico", "Dash.Fios", "Evolução de Status - Fios (Últimos 7 Dias)");
 }
 
-function atualizarEndoscopia(dadosEstoqueBrutos) {
-  atualizarSetorGenerico(dadosEstoqueBrutos, "Endoscopia", "Dash.Endoscopia", "Evolução de Status - Endoscopia (Últimos 7 Dias)");
+function atualizarEndoscopia(dadosEstoqueBrutos, dadosEntradasBrutos) {
+  atualizarSetorGenerico(dadosEstoqueBrutos, dadosEntradasBrutos, "Endoscopia", "Dash.Endoscopia", "Evolução de Status - Endoscopia (Últimos 7 Dias)");
 }
 
 // =========================================================================
 // FUNÇÃO MOTOR GENÉRICA (Processa os dados para qualquer guia nos mesmos moldes)
 // =========================================================================
 
-function atualizarSetorGenerico(dadosEstoqueBrutos, nomeAbaDados, nomeAbaDash, tituloGrafico) {
+function atualizarSetorGenerico(dadosEstoqueBrutos, dadosEntradasBrutos, nomeAbaDados, nomeAbaDash, tituloGrafico) {
   const ssLocal = SpreadsheetApp.getActiveSpreadsheet();
   const abaDados = ssLocal.getSheetByName(nomeAbaDados);
   const abaDash = ssLocal.getSheetByName(nomeAbaDash);
@@ -68,7 +77,45 @@ function atualizarSetorGenerico(dadosEstoqueBrutos, nomeAbaDados, nomeAbaDash, t
   }
 
   // =========================================================================
-  // 1. PROCESSAMENTO DOS DADOS
+  // 1. PROCESSAMENTO DE ENTRADAS (Coluna J)
+  // =========================================================================
+  const mapaEntradas = new Map();
+  if (dadosEntradasBrutos && dadosEntradasBrutos.length > 0) {
+    for (let i = 1; i < dadosEntradasBrutos.length; i++) {
+      const codItem = String(dadosEntradasBrutos[i][2]).trim().toUpperCase(); 
+      const dataEntradaRaw = dadosEntradasBrutos[i][23]; 
+      
+      if (codItem && dataEntradaRaw) {
+        let dataEntrada;
+        
+        if (dataEntradaRaw instanceof Date) {
+          dataEntrada = dataEntradaRaw;
+        } else {
+          const stringData = String(dataEntradaRaw);
+          const parts = stringData.split('/');
+          if (parts.length === 3) {
+            dataEntrada = new Date(parts[2], parts[1] - 1, parts[0]);
+          } else {
+            dataEntrada = new Date(stringData);
+          }
+        }
+        
+        if (dataEntrada instanceof Date && !isNaN(dataEntrada)) {
+          if (!mapaEntradas.has(codItem)) {
+            mapaEntradas.set(codItem, dataEntrada);
+          } else {
+            const dataAtual = mapaEntradas.get(codItem);
+            if (dataEntrada > dataAtual) {
+              mapaEntradas.set(codItem, dataEntrada);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // =========================================================================
+  // 2. PROCESSAMENTO DOS DADOS (Estoque)
   // =========================================================================
   const mapaEstoque = new Map();
   
@@ -105,7 +152,7 @@ function atualizarSetorGenerico(dadosEstoqueBrutos, nomeAbaDados, nomeAbaDash, t
   }
 
   // =========================================================================
-  // 2. ATUALIZAÇÃO DOS DADOS NA GUIA DO SETOR
+  // 3. ATUALIZAÇÃO DOS DADOS NA GUIA DO SETOR
   // =========================================================================
   const ultimaLinha = abaDados.getLastRow();
   if (ultimaLinha < 2) {
@@ -119,9 +166,19 @@ function atualizarSetorGenerico(dadosEstoqueBrutos, nomeAbaDados, nomeAbaDash, t
 
   for (let i = 0; i < codigos.length; i++) {
     const cod = String(codigos[i][0]).trim().toUpperCase();
+    
     if (!cod) {
-      matrizAtualizacao.push(["", "", "", "", "", "", "", ""]);
+      matrizAtualizacao.push(["", "", "", "", "", "", "", "", ""]);
       continue;
+    }
+
+    let dataUltimaEntradaStr = "";
+    if (mapaEntradas.has(cod)) {
+      const d = mapaEntradas.get(cod);
+      const dia = String(d.getDate()).padStart(2, '0');
+      const mes = String(d.getMonth() + 1).padStart(2, '0');
+      const ano = d.getFullYear();
+      dataUltimaEntradaStr = `${dia}/${mes}/${ano}`;
     }
 
     const info = mapaEstoque.get(cod);
@@ -134,20 +191,21 @@ function atualizarSetorGenerico(dadosEstoqueBrutos, nomeAbaDados, nomeAbaDash, t
         info.valAta,
         info.ae,
         info.empenho,
-        info.processo
+        info.processo,
+        dataUltimaEntradaStr 
       ]);
 
       const obsStr = String(info.obs).trim() || "Sem Dados";
       contagemObs[obsStr] = (contagemObs[obsStr] || 0) + 1;
     } else {
-      matrizAtualizacao.push(["Item não encontrado", "", "", "", "", "", "", ""]);
+      matrizAtualizacao.push(["Item não encontrado", "", "", "", "", "", "", "", dataUltimaEntradaStr]);
     }
   }
 
-  abaDados.getRange(2, 2, matrizAtualizacao.length, 8).setValues(matrizAtualizacao);
+  abaDados.getRange(2, 2, matrizAtualizacao.length, 9).setValues(matrizAtualizacao);
 
   // =========================================================================
-  // 3. CONSTRUÇÃO DA TABELA DE HISTÓRICO NA GUIA DASH
+  // 4. CONSTRUÇÃO DA TABELA DE HISTÓRICO NA GUIA DASH
   // =========================================================================
   const pesosCategorias = {
     "Abaixo 30 dias": 1,
@@ -188,11 +246,28 @@ function atualizarSetorGenerico(dadosEstoqueBrutos, nomeAbaDados, nomeAbaDash, t
     novaLinhaHist.push(obsKey ? (contagemObs[obsKey] || 0) : 0);
   }
 
-  histData.push(novaLinhaHist);
-
-  if (histData.length > 7) {
-    histData = histData.slice(histData.length - 7);
+  // --- NOVA LÓGICA DE SUBSTITUIÇÃO DA DATA ATUAL ---
+  let existeHoje = false;
+  if (histData.length > 0) {
+    let dataUltimaLinha = histData[histData.length - 1][0];
+    let strUltima = (dataUltimaLinha instanceof Date) 
+        ? Utilities.formatDate(dataUltimaLinha, "GMT-3", "dd/MM/yyyy") 
+        : String(dataUltimaLinha);
+        
+    if (strUltima === hojeStr) {
+      existeHoje = true;
+    }
   }
+
+  if (existeHoje) {
+    histData[histData.length - 1] = novaLinhaHist; // Substitui
+  } else {
+    histData.push(novaLinhaHist); // Adiciona
+    if (histData.length > 7) {
+      histData = histData.slice(histData.length - 7);
+    }
+  }
+  // -------------------------------------------------
 
   abaDash.getRange(1, 1, abaDash.getMaxRows(), 10).clearContent();
 
@@ -206,7 +281,7 @@ function atualizarSetorGenerico(dadosEstoqueBrutos, nomeAbaDados, nomeAbaDash, t
   abaDash.getRange(2, 1, histData.length, novaLinhaHist.length).setValues(histData);
 
   // =========================================================================
-  // 4. CRIAÇÃO DO GRÁFICO NO DASH
+  // 5. CRIAÇÃO DO GRÁFICO NO DASH
   // =========================================================================
   const charts = abaDash.getCharts();
   charts.forEach(c => abaDash.removeChart(c));

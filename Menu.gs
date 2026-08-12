@@ -44,8 +44,15 @@ function processarRotinaCompleta() {
     return;
   }
   
-  // Puxa toda a matriz de dados de uma vez só (como texto para evitar bugs de data)
+  // Puxa toda a matriz de dados de estoque de uma vez só (como texto para evitar bugs de data)
   const dadosEstoqueBrutos = guiaOrigem.getDataRange().getDisplayValues();
+
+  // Puxa toda a matriz de entradas de uma vez só (usando getValues para manter objetos de Data)
+  const guiaEntradas = ssOrigem.getSheetByName('EntradaEmpenhos');
+  let dadosEntradasBrutos = [];
+  if (guiaEntradas) {
+    dadosEntradasBrutos = guiaEntradas.getDataRange().getValues();
+  }
   
   // =========================================================================
   // 2. DISPARO DAS FUNÇÕES EM SEQUÊNCIA
@@ -58,13 +65,13 @@ function processarRotinaCompleta() {
   criarPlanilhaUrgencias(); // Esta não precisa receber dados externos, ela lê o NATHCI interno
   
   ssLocal.toast('Atualizando Centro Cirúrgico...', 'Passo 4 de 7', 5);
-  atualizarCentroCirurgico(dadosEstoqueBrutos);
+  atualizarCentroCirurgico(dadosEstoqueBrutos, dadosEntradasBrutos);
 
   ssLocal.toast('Atualizando Fios Centro Cirúrgico...', 'Passo 5 de 7', 5);
-  atualizarFiosCentroCirurgico(dadosEstoqueBrutos);
+  atualizarFiosCentroCirurgico(dadosEstoqueBrutos, dadosEntradasBrutos);
 
   ssLocal.toast('Atualizando Endoscopia...', 'Passo 6 de 7', 5);
-  atualizarEndoscopia(dadosEstoqueBrutos);
+  atualizarEndoscopia(dadosEstoqueBrutos, dadosEntradasBrutos);
   
   ssLocal.toast('Atualizando Guia HCI...', 'Passo 7 de 7', 5);
   // Esta fica por último pois dispara a tela de confirmação de e-mail ao final

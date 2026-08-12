@@ -208,23 +208,45 @@ function importarDados(dadosEstoqueBrutos) {
     rangeDestino.setWrap(true);
   }
 
+  // --- LÓGICA DE GRAVAÇÃO DO HISTÓRICO ATUALIZADA ---
   const guiaHistorico = ssDestino.getSheetByName('Historico_Resumo') || ssDestino.insertSheet('Historico_Resumo');
-  if (guiaHistorico.getLastRow() === 0) {
+  let lastRowHist = guiaHistorico.getLastRow();
+  
+  if (lastRowHist === 0) {
     guiaHistorico.appendRow(["Data", "Itens Zerados", "Entre 30 e 59 Dias", "Entre 60 e 89 Dias", "Igual ou Maior a 90 Dias", "Primeira Compra"]);
     guiaHistorico.getRange(1, 1, 1, 6).setBackground("#444444").setFontColor("white").setFontWeight("bold");
+    lastRowHist = 1;
   }
   
   let dataAtual = new Date();
   dataAtual.setHours(0, 0, 0, 0);
-  guiaHistorico.appendRow([
+  let strHoje = Utilities.formatDate(new Date(), "GMT-3", "dd/MM/yyyy");
+  
+  let linhaParaGravar = lastRowHist + 1;
+  
+  if (lastRowHist > 1) {
+    let valorUltimaData = guiaHistorico.getRange(lastRowHist, 1).getValue();
+    let strUltimaData = (valorUltimaData instanceof Date) 
+        ? Utilities.formatDate(valorUltimaData, "GMT-3", "dd/MM/yyyy") 
+        : String(valorUltimaData);
+        
+    // Verifica se a data da última linha é igual a hoje
+    if (strUltimaData === strHoje) {
+      linhaParaGravar = lastRowHist; // Se for igual, sobrescreve a mesma linha
+    }
+  }
+  
+  const novaLinha = [
     dataAtual,
     contagem["Itens Zerados"].total,
     contagem["Entre 30 e 59 Dias"].total,
     contagem["Entre 60 e 89 Dias"].total,
     contagem["Igual ou Maior a 90 Dias"].total,
     contagem["Primeira Compra"].total
-  ]);
-  guiaHistorico.getRange(2, 1, guiaHistorico.getLastRow(), 1).setNumberFormat("dd/MM/yyyy");
+  ];
+  
+  guiaHistorico.getRange(linhaParaGravar, 1, 1, 6).setValues([novaLinha]);
+  guiaHistorico.getRange(2, 1, Math.max(2, guiaHistorico.getLastRow()), 1).setNumberFormat("dd/MM/yyyy");
   
   if (typeof atualizarDashboardComRelatorio === "function") {
     atualizarDashboardComRelatorio(guiaDash, contagem);
