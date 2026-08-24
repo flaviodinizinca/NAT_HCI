@@ -222,6 +222,11 @@ function atualizarSetorGenerico(dadosEstoqueBrutos, dadosEntradasBrutos, nomeAba
     return pesoA - pesoB;
   }).slice(0, 5); 
 
+  // --- CORREÇÃO AQUI: Preencher o array com strings vazias para garantir exatamente 5 colunas ---
+  while (topObs.length < 5) {
+    topObs.push("");
+  }
+
   const cabecalhoHist = ["Data", ...topObs];
   
   let histData = [];
