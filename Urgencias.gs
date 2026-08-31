@@ -1,6 +1,36 @@
-function criarPlanilhaUrgencias() {
+// =========================================================================
+// FUNÇÃO AUXILIAR PARA RODAR ISOLADAMENTE PELO MENU
+// =========================================================================
+function criarPlanilhaUrgenciasIndependente() {
+  const ssLocal = SpreadsheetApp.getActiveSpreadsheet();
+  ssLocal.toast('Buscando dados no Estoque Externo...', 'Atualização', 3);
+  const idExterna = '1s44YD2ozLAbBdGQbBE5iW7HcUzvQULZqd4ynYlV_HXA';
+
+  try {
+    const ssExterna = SpreadsheetApp.openById(idExterna);
+    const guiaEstoque = ssExterna.getSheetByName('DadosEstoque');
+    const dadosEstoqueBrutos = guiaEstoque.getDataRange().getDisplayValues();
+    
+    const guiaEntradas = ssExterna.getSheetByName('EntradaEmpenhos');
+    let dadosEntradasBrutos = [];
+    if (guiaEntradas) {
+      dadosEntradasBrutos = guiaEntradas.getDataRange().getValues();
+    }
+    
+    criarPlanilhaUrgencias(dadosEstoqueBrutos, dadosEntradasBrutos);
+    
+  } catch (e) {
+    SpreadsheetApp.getUi().alert('Erro', 'Sem permissão para acessar a base externa.', SpreadsheetApp.getUi().ButtonSet.OK);
+  }
+}
+
+// =========================================================================
+// FUNÇÃO PRINCIPAL DE CRIAÇÃO DA GUIA URGÊNCIAS
+// =========================================================================
+function criarPlanilhaUrgencias(dadosEstoqueBrutos, dadosEntradasBrutos) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const guiaNATHCI = ss.getSheetByName('NATHCI');
+  
   if (!guiaNATHCI) return;
 
   // =========================================================================
@@ -24,7 +54,6 @@ function criarPlanilhaUrgencias() {
       termosBloqueados = textoBloqueados.split(",").map(termo => termo.trim()).filter(termo => termo !== "");
     }
   }
-
   const limiteCmm = aceitarCmmZero ? 0 : 1; 
 
   // =========================================================================
@@ -44,48 +73,78 @@ function criarPlanilhaUrgencias() {
     }
   }
 
-  let guiaUrgencias = ss.getSheetByName('Urgências');
-  
   // =========================================================================
-  // 3. SALVAR NA MEMÓRIA AS INFORMAÇÕES EDITÁVEIS (HCI a HCIV)
+  // 3. MAPEAR ESTOQUE E ENTRADAS (Para Saldo Ata e Última Entrada)
   // =========================================================================
-  const historicoUrgencias = {};
+  const mapaEntradas = new Map();
+  if (dadosEntradasBrutos && dadosEntradasBrutos.length > 0) {
+    for (let i = 1; i < dadosEntradasBrutos.length; i++) {
+      const codItem = String(dadosEntradasBrutos[i][2]).trim().toUpperCase(); 
+      const dataEntradaRaw = dadosEntradasBrutos[i][23]; 
 
-  if (guiaUrgencias) {
-    const ultimaLinha = guiaUrgencias.getLastRow();
-    if (ultimaLinha > 1) {
-      // Como a estrutura nova vai até a coluna J (índice 10)
-      const ultimaColunaParaPreservar = Math.max(10, guiaUrgencias.getLastColumn());
-      const dadosExistentes = guiaUrgencias.getRange(2, 1, ultimaLinha - 1, ultimaColunaParaPreservar).getValues();
-      for (let i = 0; i < dadosExistentes.length; i++) {
-        const itemCode = String(dadosExistentes[i][0]).trim().toUpperCase();
-        if (itemCode !== "") {
-          historicoUrgencias[itemCode] = {
-            hci: dadosExistentes[i][6],   // Coluna G
-            hcii: dadosExistentes[i][7],  // Coluna H
-            hciii: dadosExistentes[i][8], // Coluna I
-            hciv: dadosExistentes[i][9]   // Coluna J
-          };
+      if (codItem && dataEntradaRaw) {
+        let dataEntrada = null;
+        if (dataEntradaRaw instanceof Date) {
+          dataEntrada = dataEntradaRaw;
+        } else {
+          const stringData = String(dataEntradaRaw).trim();
+          if (stringData !== "" && stringData !== "00:00:00" && stringData !== "0") {
+            const parts = stringData.split('/');
+            if (parts.length === 3) {
+              dataEntrada = new Date(parts[2], parts[1] - 1, parts[0]);
+            } else {
+              dataEntrada = new Date(stringData);
+            }
+          }
+        }
+        
+        if (dataEntrada instanceof Date && !isNaN(dataEntrada) && dataEntrada.getFullYear() > 1900) {
+          if (!mapaEntradas.has(codItem)) {
+            mapaEntradas.set(codItem, dataEntrada);
+          } else {
+            const dataAtual = mapaEntradas.get(codItem);
+            if (dataEntrada > dataAtual) {
+              mapaEntradas.set(codItem, dataEntrada);
+            }
+          }
         }
       }
     }
-  } else {
-    guiaUrgencias = ss.insertSheet('Urgências');
+  }
+
+  const INDICE_SALDO_ATA = 24; // Coluna Y da aba DadosEstoque externa. Altere se necessário.
+  const mapaEstoque = new Map();
+  if (dadosEstoqueBrutos && dadosEstoqueBrutos.length > 0) {
+    for (let i = 2; i < dadosEstoqueBrutos.length; i++) {
+      const codItem = String(dadosEstoqueBrutos[i][1]).trim().toUpperCase();
+      if (codItem) {
+        mapaEstoque.set(codItem, {
+          saldoAta: dadosEstoqueBrutos[i][INDICE_SALDO_ATA],
+          validadeAta: dadosEstoqueBrutos[i][25] 
+        });
+      }
+    }
   }
 
   // =========================================================================
   // 4. LIMPAR A GUIA PRESERVANDO A FORMATAÇÃO DA LINHA 1
   // =========================================================================
+  let guiaUrgencias = ss.getSheetByName('Urgências');
+  if (!guiaUrgencias) {
+    guiaUrgencias = ss.insertSheet('Urgências');
+  }
+
   const maxRows = guiaUrgencias.getMaxRows();
   if (maxRows > 1) {
-    // Limpa conteúdo e validações antigas apenas da linha 2 para baixo
+    // Como você apagou as colunas da I em diante, limpamos até a última coluna disponível
     guiaUrgencias.getRange(2, 1, maxRows - 1, guiaUrgencias.getMaxColumns()).clearContent();
     guiaUrgencias.getRange(2, 1, maxRows - 1, guiaUrgencias.getMaxColumns()).clearDataValidations();
   }
 
   const dados = guiaNATHCI.getDataRange().getValues();
-  // Novo cabeçalho adaptado de A até J
-  const cabecalho = ["Item", "Descrição", "CMM", "Saldo", "Obs", "Validade Ata", "HCI", "HCII", "HCIII", "HCIV"];
+  
+  // Novo cabeçalho alinhado com as suas alterações (A até H)
+  const cabecalho = ["Item", "Descrição", "CMM", "Saldo", "Obs", "Saldo Ata", "Validade Ata", "Última Entrada"];
   const itensFiltrados = [];
 
   const parseNumero = (val) => {
@@ -96,7 +155,7 @@ function criarPlanilhaUrgencias() {
   };
 
   // =========================================================================
-  // 5. FILTRAGEM DINÂMICA
+  // 5. FILTRAGEM DINÂMICA E CRUZAMENTO DOS DADOS
   // =========================================================================
   for (let i = 1; i < dados.length; i++) {
     const itemCodeOriginal = String(dados[i][0]).trim();
@@ -118,9 +177,10 @@ function criarPlanilhaUrgencias() {
 
     const isExtra = usarDadosExtras && itensExtras.has(itemCode);
     const isEntre30e59Dias = categoriaColunaH.includes('entre 30 e 59 dias');
+    
     let atendeUrgencia = false;
-
     let saldoDiasCalculado = saldoDiasOriginal !== "" ? parseNumero(saldoDiasOriginal) : null;
+    
     if (cmm > 0) {
       saldoDiasCalculado = (saldo / cmm) * 30;
     }
@@ -140,42 +200,54 @@ function criarPlanilhaUrgencias() {
     }
 
     if (atendeUrgencia) {
-      const historicoItem = historicoUrgencias[itemCode] || {};
+      let saldoAta = "";
+      let valAta = "";
+      let dataUltimaEntradaStr = "Ainda não houve entrada";
       
+      if (mapaEstoque.has(itemCode)) {
+        saldoAta = mapaEstoque.get(itemCode).saldoAta;
+        valAta = mapaEstoque.get(itemCode).validadeAta;
+      }
+      
+      if (mapaEntradas.has(itemCode)) {
+        const d = mapaEntradas.get(itemCode);
+        const dia = String(d.getDate()).padStart(2, '0');
+        const mes = String(d.getMonth() + 1).padStart(2, '0');
+        const ano = d.getFullYear();
+        dataUltimaEntradaStr = `${dia}/${mes}/${ano}`;
+      }
+
       itensFiltrados.push([
         itemCodeOriginal,
-        dados[i][1],
-        dados[i][5],
-        dados[i][4],
-        dados[i][7],
-        dados[i][9], // Informação vinda agora da Coluna Y mapeada em Importacao.gs
-        historicoItem.hci || "",
-        historicoItem.hcii || "",
-        historicoItem.hciii || "",
-        historicoItem.hciv || ""
+        dados[i][1], // Descrição
+        dados[i][5], // CMM
+        dados[i][4], // Saldo
+        dados[i][7], // Obs
+        saldoAta,    // Saldo Ata (F)
+        valAta,      // Validade Ata (G)
+        dataUltimaEntradaStr // Última Entrada (H)
       ]);
     }
   }
 
   // =========================================================================
-  // 6. GRAVAÇÃO DOS DADOS E FORMATAÇÕES
+  // 6. GRAVAÇÃO DOS DADOS E FORMATAÇÃO
   // =========================================================================
-  
-  // Usamos apenas setValues na linha 1. Assim ele não afeta as cores e formatações manuais que você fez!
   guiaUrgencias.getRange(1, 1, 1, cabecalho.length).setValues([cabecalho]);
-
+  
   if (itensFiltrados.length > 0) {
     guiaUrgencias.getRange(2, 1, itensFiltrados.length, cabecalho.length).setValues(itensFiltrados);
     
-    // Força a formatação de data na coluna F (índice 6)
-    guiaUrgencias.getRange(2, 6, itensFiltrados.length, 1).setNumberFormat("dd/MM/yyyy");
+    // Força a formatação de data na coluna G (Validade Ata - índice 7)
+    // A coluna H (Última Entrada) já está indo como texto formatado dd/mm/yyyy
+    guiaUrgencias.getRange(2, 7, itensFiltrados.length, 1).setNumberFormat("dd/MM/yyyy");
   }
 
   guiaUrgencias.autoResizeColumns(1, cabecalho.length);
   guiaUrgencias.setFrozenRows(1);
-  
+
   if (itensFiltrados.length > 0) {
-    SpreadsheetApp.getUi().alert('Guia de Urgências criada com ' + itensFiltrados.length + ' itens baseados nas suas regras parametrizadas.');
+    SpreadsheetApp.getUi().alert('Guia de Urgências atualizada com ' + itensFiltrados.length + ' itens.');
   } else {
     SpreadsheetApp.getUi().alert('Nenhum item atende aos critérios de urgência configurados na aba Regras.');
   }
