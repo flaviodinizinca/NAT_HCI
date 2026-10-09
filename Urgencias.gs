@@ -4,10 +4,12 @@
 function criarPlanilhaUrgenciasIndependente() {
   const ssLocal = SpreadsheetApp.getActiveSpreadsheet();
   ssLocal.toast('Buscando dados no Estoque Externo...', 'Atualização', 3);
+
   const idExterna = '1s44YD2ozLAbBdGQbBE5iW7HcUzvQULZqd4ynYlV_HXA';
 
   try {
     const ssExterna = SpreadsheetApp.openById(idExterna);
+    
     const guiaEstoque = ssExterna.getSheetByName('DadosEstoque');
     const dadosEstoqueBrutos = guiaEstoque.getDataRange().getDisplayValues();
     
@@ -30,7 +32,7 @@ function criarPlanilhaUrgenciasIndependente() {
 function criarPlanilhaUrgencias(dadosEstoqueBrutos, dadosEntradasBrutos) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const guiaNATHCI = ss.getSheetByName('NATHCI');
-  
+
   if (!guiaNATHCI) return;
 
   // =========================================================================
@@ -54,6 +56,7 @@ function criarPlanilhaUrgencias(dadosEstoqueBrutos, dadosEntradasBrutos) {
       termosBloqueados = textoBloqueados.split(",").map(termo => termo.trim()).filter(termo => termo !== "");
     }
   }
+
   const limiteCmm = aceitarCmmZero ? 0 : 1; 
 
   // =========================================================================
@@ -112,15 +115,16 @@ function criarPlanilhaUrgencias(dadosEstoqueBrutos, dadosEntradasBrutos) {
     }
   }
 
-  const INDICE_SALDO_ATA = 24; // Coluna Y da aba DadosEstoque externa. Altere se necessário.
+  const INDICE_SALDO_ATA = 27; // Atualizado para 27 (Coluna AB)
   const mapaEstoque = new Map();
+
   if (dadosEstoqueBrutos && dadosEstoqueBrutos.length > 0) {
     for (let i = 2; i < dadosEstoqueBrutos.length; i++) {
       const codItem = String(dadosEstoqueBrutos[i][1]).trim().toUpperCase();
       if (codItem) {
         mapaEstoque.set(codItem, {
           saldoAta: dadosEstoqueBrutos[i][INDICE_SALDO_ATA],
-          validadeAta: dadosEstoqueBrutos[i][25] 
+          validadeAta: dadosEstoqueBrutos[i][28] // Atualizado para 28
         });
       }
     }
@@ -136,14 +140,13 @@ function criarPlanilhaUrgencias(dadosEstoqueBrutos, dadosEntradasBrutos) {
 
   const maxRows = guiaUrgencias.getMaxRows();
   if (maxRows > 1) {
-    // Como você apagou as colunas da I em diante, limpamos até a última coluna disponível
     guiaUrgencias.getRange(2, 1, maxRows - 1, guiaUrgencias.getMaxColumns()).clearContent();
     guiaUrgencias.getRange(2, 1, maxRows - 1, guiaUrgencias.getMaxColumns()).clearDataValidations();
   }
 
   const dados = guiaNATHCI.getDataRange().getValues();
-  
-  // Novo cabeçalho alinhado com as suas alterações (A até H)
+
+  // Novo cabeçalho alinhado com as suas alterações
   const cabecalho = ["Item", "Descrição", "CMM", "Saldo", "Obs", "Saldo Ata", "Validade Ata", "Última Entrada"];
   const itensFiltrados = [];
 
@@ -234,7 +237,7 @@ function criarPlanilhaUrgencias(dadosEstoqueBrutos, dadosEntradasBrutos) {
   // 6. GRAVAÇÃO DOS DADOS E FORMATAÇÃO
   // =========================================================================
   guiaUrgencias.getRange(1, 1, 1, cabecalho.length).setValues([cabecalho]);
-  
+
   if (itensFiltrados.length > 0) {
     guiaUrgencias.getRange(2, 1, itensFiltrados.length, cabecalho.length).setValues(itensFiltrados);
     

@@ -1,6 +1,7 @@
 // =========================================================================
 // FUNÇÕES AUXILIARES PARA RODAR ISOLADAMENTE PELO MENU
 // =========================================================================
+
 function atualizarCentroCirurgicoIndependente() {
   executarAtualizacaoIsolada(atualizarCentroCirurgico, 'Centro.Cir.', 'Dash.C.Cir');
 }
@@ -16,6 +17,7 @@ function atualizarEndoscopiaIndependente() {
 function executarAtualizacaoIsolada(funcaoAtualizacao, abaDados, abaDash) {
   const ssLocal = SpreadsheetApp.getActiveSpreadsheet();
   ssLocal.toast(`Buscando dados no Estoque Externo para ${abaDados}...`, 'Atualização', 3);
+
   const idExterna = '1s44YD2ozLAbBdGQbBE5iW7HcUzvQULZqd4ynYlV_HXA';
 
   try {
@@ -33,6 +35,7 @@ function executarAtualizacaoIsolada(funcaoAtualizacao, abaDados, abaDash) {
     funcaoAtualizacao(dadosEstoqueBrutos, dadosEntradasBrutos);
     
     SpreadsheetApp.getUi().alert('Sucesso', `Valores atualizados na aba ${abaDados} e Gráfico gerado na aba ${abaDash}!`, SpreadsheetApp.getUi().ButtonSet.OK);
+    
   } catch (e) {
     SpreadsheetApp.getUi().alert('Erro', 'Sem permissão para acessar a base externa.', SpreadsheetApp.getUi().ButtonSet.OK);
   }
@@ -41,6 +44,7 @@ function executarAtualizacaoIsolada(funcaoAtualizacao, abaDados, abaDash) {
 // =========================================================================
 // FUNÇÕES ESPECÍFICAS DE CADA SETOR
 // =========================================================================
+
 function atualizarCentroCirurgico(dadosEstoqueBrutos, dadosEntradasBrutos) {
   atualizarSetorGenerico(dadosEstoqueBrutos, dadosEntradasBrutos, "Centro.Cir.", "Dash.C.Cir", "Evolução de Status - Centro Cirúrgico (Últimos 7 Dias)", "CENTRO");
 }
@@ -53,10 +57,13 @@ function atualizarEndoscopia(dadosEstoqueBrutos, dadosEntradasBrutos) {
   atualizarSetorGenerico(dadosEstoqueBrutos, dadosEntradasBrutos, "Endoscopia", "Dash.Endoscopia", "Evolução de Status - Endoscopia (Últimos 7 Dias)", "FIOS_ENDO");
 }
 
+
 // =========================================================================
 // FUNÇÃO MOTOR GENÉRICA
 // =========================================================================
+
 function atualizarSetorGenerico(dadosEstoqueBrutos, dadosEntradasBrutos, nomeAbaDados, nomeAbaDash, tituloGrafico, tipoLayout) {
+  
   const ssLocal = SpreadsheetApp.getActiveSpreadsheet();
   const abaDados = ssLocal.getSheetByName(nomeAbaDados);
   const abaDash = ssLocal.getSheetByName(nomeAbaDash);
@@ -113,16 +120,16 @@ function atualizarSetorGenerico(dadosEstoqueBrutos, dadosEntradasBrutos, nomeAba
   // =========================================================================
   // 2. PROCESSAMENTO DOS DADOS (Estoque)
   // =========================================================================
-  const INDICE_SALDO_ATA = 24; // Coluna Y da aba DadosEstoque externa. Altere se necessário.
-  
+  const INDICE_SALDO_ATA = 27; // Atualizado para Coluna AB
   const mapaEstoque = new Map();
+
   for (let i = 2; i < dadosEstoqueBrutos.length; i++) {
-    const codItem = String(dadosEstoqueBrutos[i][1]).trim().toUpperCase();
-      
+    const codItem = String(dadosEstoqueBrutos[i][1]).trim().toUpperCase();       
+    
     if (codItem) {
       const procArr = [];
-      const procAta = String(dadosEstoqueBrutos[i][19] || '').trim();
-      const procAnd = String(dadosEstoqueBrutos[i][27] || '').trim();
+      const procAta = String(dadosEstoqueBrutos[i][22] || '').trim(); // Atualizado para 22
+      const procAnd = String(dadosEstoqueBrutos[i][30] || '').trim(); // Atualizado para 30
       
       if (procAta) {
         procAta.split('\n').forEach(p => { if (p.trim()) procArr.push(p.trim() + " - Ata"); });
@@ -135,11 +142,11 @@ function atualizarSetorGenerico(dadosEstoqueBrutos, dadosEntradasBrutos, nomeAba
         desc: dadosEstoqueBrutos[i][2],
         cmm: dadosEstoqueBrutos[i][8],
         saldo: dadosEstoqueBrutos[i][7],
-        obs: dadosEstoqueBrutos[i][12],
+        obs: dadosEstoqueBrutos[i][15], // Atualizado para 15
         saldoAta: dadosEstoqueBrutos[i][INDICE_SALDO_ATA], 
-        valAta: dadosEstoqueBrutos[i][25],
-        ae: dadosEstoqueBrutos[i][30],
-        empenho: dadosEstoqueBrutos[i][13],
+        valAta: dadosEstoqueBrutos[i][28], // Atualizado para 28
+        ae: dadosEstoqueBrutos[i][33], // Atualizado para 33
+        empenho: dadosEstoqueBrutos[i][16], // Atualizado para 16
         processo: procArr.join('\n')
       });
     }
@@ -155,7 +162,7 @@ function atualizarSetorGenerico(dadosEstoqueBrutos, dadosEntradasBrutos, nomeAba
   }
 
   const codigos = abaDados.getRange(2, 1, ultimaLinha - 1, 1).getDisplayValues();
-  
+
   // Matrizes de atualização dependendo do layout
   const matrizBlocoPrincipal = []; // Usado por ambos, mas com larguras diferentes
   const matrizUltimaEntradaIsolada = []; // Usado apenas pelo Centro Cirúrgico
@@ -196,6 +203,7 @@ function atualizarSetorGenerico(dadosEstoqueBrutos, dadosEntradasBrutos, nomeAba
       
       const obsStr = String(info.obs).trim() || "Sem Dados";
       contagemObs[obsStr] = (contagemObs[obsStr] || 0) + 1;
+
     } else {
       if (tipoLayout === "CENTRO") {
         matrizBlocoPrincipal.push(["Item não encontrado", "", "", "", "", "", "", ""]);
@@ -206,7 +214,7 @@ function atualizarSetorGenerico(dadosEstoqueBrutos, dadosEntradasBrutos, nomeAba
     }
   }
 
-  // Despeja os dados preservando formatações
+  // Despeja os dados preservando formatação
   if (tipoLayout === "CENTRO") {
     abaDados.getRange(2, 2, matrizBlocoPrincipal.length, 8).setValues(matrizBlocoPrincipal); // Colunas B até I
     abaDados.getRange(2, 12, matrizUltimaEntradaIsolada.length, 1).setValues(matrizUltimaEntradaIsolada); // Coluna L isolada
@@ -246,6 +254,7 @@ function atualizarSetorGenerico(dadosEstoqueBrutos, dadosEntradasBrutos, nomeAba
     for (let k = 0; k < valsI.length; k++) {
       if (valsI[k][0] !== "") lastRowHist = k + 1;
     }
+    
     if (lastRowHist > 1) {
       histData = abaDash.getRange(2, 1, lastRowHist - 1, cabecalhoHist.length).getValues();
     }
@@ -253,6 +262,7 @@ function atualizarSetorGenerico(dadosEstoqueBrutos, dadosEntradasBrutos, nomeAba
 
   let hojeStr = Utilities.formatDate(new Date(), "GMT-3", "dd/MM/yyyy");
   let novaLinhaHist = [hojeStr];
+
   for (let i = 0; i < 5; i++) {
     let obsKey = topObs[i];
     novaLinhaHist.push(obsKey ? (contagemObs[obsKey] || 0) : 0);
@@ -262,9 +272,9 @@ function atualizarSetorGenerico(dadosEstoqueBrutos, dadosEntradasBrutos, nomeAba
   if (histData.length > 0) {
     let dataUltimaLinha = histData[histData.length - 1][0];
     let strUltima = (dataUltimaLinha instanceof Date) 
-         ? Utilities.formatDate(dataUltimaLinha, "GMT-3", "dd/MM/yyyy") 
-         : String(dataUltimaLinha);
-         
+          ? Utilities.formatDate(dataUltimaLinha, "GMT-3", "dd/MM/yyyy") 
+          : String(dataUltimaLinha);
+          
     if (strUltima === hojeStr) {
       existeHoje = true;
     }
@@ -280,6 +290,7 @@ function atualizarSetorGenerico(dadosEstoqueBrutos, dadosEntradasBrutos, nomeAba
   }
 
   abaDash.getRange(1, 1, abaDash.getMaxRows(), 10).clearContent();
+  
   abaDash.getRange(1, 1, 1, cabecalhoHist.length)
          .setValues([cabecalhoHist])
          .setBackground("#444444")

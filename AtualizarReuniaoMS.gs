@@ -4,6 +4,7 @@
 function atualizarReuniaoMSIndependente() {
   const ssLocal = SpreadsheetApp.getActiveSpreadsheet();
   ssLocal.toast('Buscando dados no Estoque Externo...', 'Atualização', 3);
+
   const idExterna = '1s44YD2ozLAbBdGQbBE5iW7HcUzvQULZqd4ynYlV_HXA';
 
   try {
@@ -27,12 +28,14 @@ function atualizarReuniaoMSIndependente() {
   }
 }
 
+
 // =========================================================================
 // FUNÇÃO PRINCIPAL DE ATUALIZAÇÃO DA GUIA
 // =========================================================================
 function atualizarReuniaoMS(dadosEstoqueBrutos, dadosEntradasBrutos) {
   // Ajuste do nome exato da guia conforme você informou
   const nomeGuia = 'itens avaliados na Reuniao com MS - 12/08/2026';
+  
   const ssLocal = SpreadsheetApp.getActiveSpreadsheet();
   const guiaDestino = ssLocal.getSheetByName(nomeGuia);
 
@@ -95,14 +98,14 @@ function atualizarReuniaoMS(dadosEstoqueBrutos, dadosEntradasBrutos) {
       mapaEstoque.set(codItem, {
         estoque: dadosEstoqueBrutos[i][7],  // Coluna H (Índice 7)
         cmm: dadosEstoqueBrutos[i][8],      // Coluna I (Índice 8)
-        empenho: dadosEstoqueBrutos[i][13], // Coluna N (Índice 13)
-        ae: dadosEstoqueBrutos[i][30]       // Coluna AE (Índice 30)
+        empenho: dadosEstoqueBrutos[i][16], // Coluna Q (Índice 16) - Atualizado
+        ae: dadosEstoqueBrutos[i][33]       // Coluna AH (Índice 33) - Atualizado
       });
     }
   }
 
   // =========================================================================
-  // 3. INJEÇÃO DOS DADOS NAS COLUNAS ALVO (Sem formatação)
+  // 3. INJEÇÃO DOS DADOS NAS COLUNAS ALVO (Sem formatar a planilha)
   // =========================================================================
   const ultimaLinha = guiaDestino.getLastRow();
   if (ultimaLinha < 2) {
@@ -112,7 +115,7 @@ function atualizarReuniaoMS(dadosEstoqueBrutos, dadosEntradasBrutos) {
 
   // Lê apenas a Coluna A, assumindo que os códigos dos itens estejam lá
   const codigos = guiaDestino.getRange(2, 1, ultimaLinha - 1, 1).getDisplayValues();
-  
+
   // Matrizes isoladas para não sobrescrever colunas adjacentes
   const valoresCMM = [];      // Coluna D
   const valoresAE = [];       // Coluna G

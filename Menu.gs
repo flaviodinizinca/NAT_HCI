@@ -4,7 +4,7 @@
 function onOpen() {
   const ui = SpreadsheetApp.getUi();
   ui.createMenu('⚙️ Gestão de Estoque')
-    .addItem('▶️ Executar Rotina Completa', 'processarRotinaCompleta')
+    .addItem('🚀 Executar Rotina Completa', 'processarRotinaCompleta')
     .addSeparator()
     .addItem('1. Atualizar Base de Dados', 'importarDadosIndependente')
     .addItem('2. Gerar Planilha de Urgências', 'criarPlanilhaUrgenciasIndependente')
@@ -32,6 +32,7 @@ function processarRotinaCompleta() {
   // =========================================================================
   const ssOrigemId = '1s44YD2ozLAbBdGQbBE5iW7HcUzvQULZqd4ynYlV_HXA';
   let ssOrigem;
+  
   try {
     ssOrigem = SpreadsheetApp.openById(ssOrigemId);
   } catch (e) {
@@ -47,7 +48,7 @@ function processarRotinaCompleta() {
 
   // Puxa toda a matriz de dados de estoque de uma vez só (como texto para evitar bugs de data)
   const dadosEstoqueBrutos = guiaOrigem.getDataRange().getDisplayValues();
-
+  
   // Puxa toda a matriz de entradas de uma vez só (usando getValues para manter objetos de Data)
   const guiaEntradas = ssOrigem.getSheetByName('EntradaEmpenhos');
   let dadosEntradasBrutos = [];
@@ -58,9 +59,10 @@ function processarRotinaCompleta() {
   // =========================================================================
   // 2. DISPARO DAS FUNÇÕES EM SEQUÊNCIA
   // =========================================================================
+  
   ssLocal.toast('Atualizando Base de Dados (NATHCI)...', 'Passo 2 de 8', 5);
   importarDados(dadosEstoqueBrutos);
-  
+
   ssLocal.toast('Gerando Planilha de Urgências...', 'Passo 3 de 8', 5);
   // Agora a função de Urgências recebe os dados externos na memória
   criarPlanilhaUrgencias(dadosEstoqueBrutos, dadosEntradasBrutos); 
