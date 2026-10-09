@@ -114,6 +114,8 @@ function importarDados(dadosEstoqueBrutos) {
       
       const validadeAta = linha[28]; // Atualizado para 28
       
+      const saldoAta = linha[26]; // Coluna AA (Índice 26 = Coluna AA)
+      
       const aeOriginal = String(linha[33]).trim(); // Atualizado para 33
       const empOriginal = String(linha[16]).trim(); // Atualizado para 16
       
@@ -140,9 +142,8 @@ function importarDados(dadosEstoqueBrutos) {
           dicionarioItens[codItem] = {
             codItemBase: codItem,
             desc: linha[2],
-            grupo: linha[3],
-            familia: linha[4], 
-            saldo: saldoFinalReal, 
+            saldo: saldoFinalReal,
+            saldoAta: saldoAta,
             cmm: linha[8], 
             saldoDias: linha[13], // Atualizado para 13
             obs: obsRaw, 
@@ -197,19 +198,21 @@ function importarDados(dadosEstoqueBrutos) {
       contagem[cat].semProcesso++;
     }
 
+    // Nova estrutura SEM Grupo e Família, COM Saldo da Ata após Saldo
     listaFinal.push([
-      "'" + obj.codItemBase, obj.desc, obj.grupo, "'" + obj.familia, obj.saldo, 
+      "'" + obj.codItemBase, obj.desc, obj.saldo, obj.saldoAta,
       obj.cmm, obj.saldoDias, obj.obs, strProcessos, obj.validadeAta, strAes, strEmpenhos
     ]);
 
     contagem[cat].itens.push([obj.codItemBase, obj.desc, cat, strEmpenhos, strAes, strProcessos]);
   });
 
-  guiaNATHCI.clear().getRange(1, 1, 1, 12).setValues([["Item", "Descrição", "Grupo", "Família", "Saldo", "CMM", "Saldo Dias", "Obs", "Processo SEI", "Validade Ata", "AE (Filtro 1)", "Empenho (Status)"]])
+  // Atualizar cabeçalho: removendo Grupo e Família, adicionando Saldo da Ata após Saldo
+  guiaNATHCI.clear().getRange(1, 1, 1, 11).setValues([["Item", "Descrição", "Saldo", "Saldo da Ata", "CMM", "Saldo Dias", "Obs", "Processo SEI", "Validade Ata", "AE (Filtro 1)", "Empenho"]])
     .setBackground("#444444").setFontColor("white");
 
   if (listaFinal.length > 0) {
-    const rangeDestino = guiaNATHCI.getRange(2, 1, listaFinal.length, 12);
+    const rangeDestino = guiaNATHCI.getRange(2, 1, listaFinal.length, 11);
     rangeDestino.setValues(listaFinal);
     rangeDestino.setWrap(true);
   }
